@@ -1,378 +1,47 @@
-Capabilities → 
-
-1. CAPABILITIES (WHAT)
-Wake word activation (“Jarvis”)
-Speech-to-text (understand user voice)
-Text-to-speech (respond with voice)
-Answer general questions (AI)
-Store and manage timetable
-Answer timetable-related questions
-Display conversation (basic UI)
-
-💡 One Smart Upgrade (Optional)
-
-If you want a tiny edge without much complexity:
-
-Add:
-
-“Add to timetable” via voice
-(“Jarvis, add gym at 6pm tomorrow”)
-
-👉 Makes it feel WAY more like a real assistant
-
-
-Behaviors → 
-
-
-⚙️ 2. BEHAVIORS (HOW IT ACTS)
-🧠 1. General Behavior
-Always waits for wake word (“Jarvis”) before activating
-Responds with voice + text
-Keeps responses short unless asked for more detail
-If it doesn’t understand → asks for clarification
-Maintains basic context within a conversation
-🎤 2. Voice Flow (Step-by-Step)
-
-Idle State
-
-Listening for “Jarvis”
-
-Activation
-
-Wake word detected → start recording
-
-Listening
-
-Records user speech until silence or timeout
-
-Processing
-
-Convert speech → text
-
-Decision
-
-Decide:
-timetable request
-general question
-
-Response
-
-Generate answer (AI or timetable logic)
-
-Output
-
-Speak response
-Display text in UI
-
-Return
-
-Go back to idle
-🧭 3. Decision Logic (VERY IMPORTANT)
-
-When text is received:
-
-Step 1: Check if timetable-related
-
-Trigger words like:
-
-“schedule”
-“timetable”
-“next”
-“today”
-“tomorrow”
-specific days (“Monday” etc.)
-
-👉 If YES:
-→ handle with timetable system
-
-👉 If NO:
-→ send to AI (ChatGPT)
-
-Step 2: If unclear
-Ask follow-up:
-“Do you mean your schedule?”
-Step 3: Fallback
-If nothing matches → treat as general AI question
-📅 4. Timetable Behavior
-Queries it should handle:
-“What do I have today?”
-Get current day
-Return all events for that day
-“What’s next?”
-Get current time
-Find next upcoming event today
-If none:
-say “You’re done for today”
-“What do I have tomorrow?”
-Get next day
-Return events
-“What do I have on [day]?”
-Match day
-Return events
-Response Style
-Clear + natural:
-“You have Math at 9am and Physics at 11am”
-🔁 5. Conversation Behavior (Simple Memory)
-Remember last question context briefly
-
-Example:
-
-You: “What do I have tomorrow?”
-Then: “What about Friday?”
-
-👉 It understands you're still talking about timetable
-
-⚠️ 6. Error Handling
-If speech unclear:
-“I didn’t catch that, can you repeat?”
-If no timetable data:
-“You don’t have anything scheduled”
-If unknown command:
-fallback to AI
-
-
-Systems → 
-
-
-🧱 3. SYSTEMS (COMPONENTS)
-🎤 Input (Speech → Text)
-
-Purpose: Turn your voice into text
-
-Whisper (OpenAI API or local)
-
-👉 Start with:
-
-Whisper API (easier, less setup)
-🔊 Output (Text → Speech)
-
-Purpose: Jarvis talks back
-
-Start: OS built-in TTS (fast, free)
-Upgrade later: ElevenLabs (more realistic)
-
-👉 For now:
-
-Use pyttsx3 (Python) ← simple + offline
-🧠 AI / Brain
-
-Purpose: Answer general questions
-
-ChatGPT API
-
-👉 Important:
-
-ONLY use this for:
-general questions
-conversation
-
-NOT for:
-
-timetable logic
-commands
-📅 Data Storage (Timetable)
-
-Purpose: Store your schedule
-
-JSON file (simple, perfect for V1)
-
-Example:
-
-{
-  "monday": [
-    {"time": "09:00", "event": "Math"}
-  ]
-}
-
-👉 No database needed yet
-
-⚙️ Command / Logic System
-
-Purpose: Decide what to do
-
-Python (main backend)
-
-Libraries:
-
-datetime → time/day logic
-json → timetable
-basic if/else → decision making
-
-👉 This is your core engine
-
-🎧 Wake Word Detection
-
-Purpose: Listen for “Jarvis”
-
-Options:
-
-Porcupine (best balance)
-OR simple keyword detection (easier start)
-
-👉 Recommendation:
-
-Start simple:
-always listening loop
-detect “jarvis” in text
-
-Upgrade later → Porcupine
-
-🖥️ UI (Visual Feedback)
-
-Purpose: Show what’s happening
-
-Start simple:
-
-Option A:
-
-Python Tkinter (easiest)
-
-Option B:
-
-Basic web page (HTML/CSS/JS)
-
-Display:
-
-“Listening…”
-Your speech
-Jarvis response
-
-👉 Don’t overdesign this
-
-🧩 System Summary (Clean)
-
-If you fill your template:
-
-3. SYSTEMS (COMPONENTS)
-
-Input
-
-Whisper (speech-to-text)
-
-Output
-
-pyttsx3 (text-to-speech)
-
-AI / Brain
-
-ChatGPT API
-
-Data Storage
-
-JSON file (timetable)
-
-Command Execution
-
-Python (logic + decision making)
-
-Wake Word
-
-Simple keyword detection (“Jarvis”)
-
-UI (optional)
-
-Tkinter or basic web UI
-
-
-Architecture → 
-
-
-Idle (listening)
-   ↓
-Wake word detected (“Jarvis”)
-   ↓
-Record audio
-   ↓
-Speech → Text (Whisper)
-   ↓
-Process text (Python logic)
-   ↓
-   ├── Timetable → handle locally
-   └── General → send to AI
-   ↓
-Generate response
-   ↓
-Text → Speech
-   ↓
-Display in UI
-   ↓
-Back to idle
-
-🧠 2. Key Functions (Your Core Code)
-
-Break your system into small functions:
-
-🎤 Audio
-listen_for_wake_word()
-record_audio()
-📝 Processing
-speech_to_text(audio)
-decide_intent(text)
-📅 Timetable
-get_today_schedule()
-get_next_event()
-get_day_schedule(day)
-🤖 AI
-ask_ai(text)
-🔊 Output
-speak(text)
-🧩 Controller (MAIN)
-run_jarvis()
-
-👉 This function connects everything
-
-
-🗂️ 3. File Structure (Simple + Scalable)
-
-Keep it clean:
-
-jarvis/
-│
-├── main.py              # runs everything
-├── config.py            # API keys, settings
-│
-├── voice/
-│   ├── input.py         # mic, recording
-│   ├── output.py        # TTS
-│
-├── brain/
-│   ├── ai.py            # ChatGPT calls
-│   ├── decision.py      # intent detection
-│
-├── timetable/
-│   ├── schedule.json    # your data
-│   ├── logic.py         # timetable functions
-│
-├── ui/
-│   ├── display.py       # simple interface (optional)
-│
-└── utils/
-    ├── helpers.py
-
-
-🔀 4. Decision Routing (VERY IMPORTANT)
-
-This is the heart of your system:
-
-def handle_input(text):
-    if is_timetable_query(text):
-        return handle_timetable(text)
-    else:
-        return ask_ai(text)
-
-
-def run_jarvis():
-    while True:
-        if listen_for_wake_word():
-            audio = record_audio()
-            text = speech_to_text(audio)
-
-            response = handle_input(text)
-
-            speak(response)
-
-
-Build immediately
-
-
-Replace wake word listener with Porcupine (pvporcupine)
+═══════════════════════════════════════
+  J.A.R.V.I.S — NEXT STEPS
+  (update this as you go)
+═══════════════════════════════════════
+
+✅ COMPLETED
+───────────────────────────────────────
+ - Wake word detection ("Hey Jarvis")
+ - Voice input (Groq Whisper)
+ - Voice output (Edge TTS)
+ - General AI answers (Groq LLaMA)
+ - Timetable queries (today, next, day)
+ - Voice "add to timetable"
+ - Tkinter UI (animated orb)
+ - Timetable panel (all 7 days, scrollable)
+ - Live panel refresh when timetable changes
+ - Window closes on "exit"
+
+───────────────────────────────────────
+  UP NEXT
+───────────────────────────────────────
+
+ 1. Weather
+    - Open-Meteo API (free, no key needed)
+    - "What's the weather today / tomorrow?"
+    - Route weather questions through intent system
+
+ 2. Timetable from screenshot
+    - Upload photo of timetable
+    - Gemini vision API reads it
+    - Auto-populates timetable.json
+    - Blocked until age verification sorted
+
+ 3. Wake word upgrade
+    - Replace current keyword detection
+      with Porcupine (pvporcupine)
+    - More accurate, lower CPU, always-on
+
+───────────────────────────────────────
+  IDEAS FOR LATER
+───────────────────────────────────────
+
+ - Reminders / countdown to next event
+ - "What did I ask earlier?" (conversation memory)
+ - ElevenLabs voice upgrade
+ - Porcupine custom wake word (your own voice)
+ - System tray mode (minimise to taskbar)
