@@ -1,3 +1,7 @@
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
+
 import threading
 import time
 from logic import (is_timetable_query, handle_timetable,

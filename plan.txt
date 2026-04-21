@@ -373,3 +373,6 @@ def run_jarvis():
 
 
 Build immediately
+
+
+Replace wake word listener with Porcupine (pvporcupine)
