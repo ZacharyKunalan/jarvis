@@ -1,0 +1,143 @@
+Here's the full rundown:
+
+JARVIS V1 — Development Log
+Session 1 — Project Setup & Bug Fixes
+Fixed an ImportError where main.py was trying to import ask_ai from logic.py but the function didn't exist yet. Added ask_ai() as a placeholder function that echoes back what it hears.
+
+Session 2 — Text to Speech
+Replaced pyttsx3 with edge-tts for better quality TTS using the en-GB-RyanNeural voice. The initial implementation used os.system("start response.mp3") which was opening Windows Media Player instead of playing audio silently. Fixed by switching to playsound==1.2.2 to play the audio programmatically. pygame was attempted first but failed to install due to Python 3.13 removing distutils. playsound 1.3.0 was avoided due to a known Windows mp3 bug — pinned to 1.2.2. A winsound fallback (using .wav instead of .mp3) was documented in comments inside logic.py in case playsound causes issues.
+
+Session 3 — Voice Input (Whisper)
+Installed openai-whisper, sounddevice, and numpy for real voice input. Installed FFmpeg system-wide (required by Whisper for audio decoding) by downloading from gyan.dev and manually adding the bin folder to Windows PATH. Added listen() function to logic.py which records 5 seconds of microphone audio via sounddevice, transcribes it using the Whisper tiny model with fp16=False (required for CPU), and returns the transcribed text. Updated main.py to call listen() instead of input(), with the exit keyword check updated to use any() since voice input won't be an exact string match like typing.
+
+Current Stack
+
+TTS: edge-tts + playsound==1.2.2
+Voice input: openai-whisper (tiny model, CPU) + sounddevice
+Audio processing: FFmpeg (system-wide)
+Timetable: timetable.json with day/time based lookup
+AI: placeholder ask_ai() — to be replaced with real LLM next
+
+
+
+
+
+
+JARVIS V1 — Development Log
+Session 1 — Project Setup & Bug Fixes
+Fixed an ImportError where main.py was trying to import ask_ai from logic.py but the function didn't exist yet. Added ask_ai() as a placeholder function that echoes back what it hears.
+
+Session 2 — Text to Speech
+Replaced pyttsx3 with edge-tts for better quality TTS using the en-GB-RyanNeural voice. The initial implementation used os.system("start response.mp3") which was opening Windows Media Player instead of playing audio silently. Fixed by switching to playsound==1.2.2 to play the audio programmatically. pygame was attempted first but failed to install due to Python 3.13 removing distutils. playsound 1.3.0 was avoided due to a known Windows mp3 bug — pinned to 1.2.2. A winsound fallback using .wav was documented in comments inside logic.py.
+
+Session 3 — Voice Input (Whisper)
+Installed openai-whisper, sounddevice, and numpy for real voice input. Installed FFmpeg system-wide by downloading from gyan.dev and manually adding the bin folder to Windows PATH (winget was unavailable on this machine). Added listen() function to logic.py which records 7 seconds of microphone audio, transcribes it using Whisper tiny model with fp16=False for CPU, and returns the transcribed text. Updated main.py to call listen() instead of input().
+
+Session 4 — Groq Integration (STT + LLM)
+Switched from local Whisper tiny to Groq's hosted whisper-large-v3 for significantly more accurate transcription. Replaced local Ollama phi3:mini with Groq's llama-3.1-8b-instant for fast cloud-based responses. API key stored securely in .env file using python-dotenv. llama3-8b-8192 was attempted first but had been decommissioned by Groq — swapped to llama-3.1-8b-instant. Response speed improved dramatically. Fixed over-broad timetable routing by removing "today" from keywords — it was catching almost every sentence. Audio now saves to a temp input.wav, gets sent to Groq, then deleted after transcription.
+
+Session 5 — Known Limitations & Next Steps
+Jarvis cannot answer real-time questions like weather as the LLM has no internet access. Fix planned: integrate Open-Meteo weather API (no key required) with location detection. Wake word "Hey Jarvis" planned so the mic isn't always recording — this will make it feel much more like a real assistant and reduce accidental triggers.
+
+Current Stack
+
+TTS: edge-tts + playsound==1.2.2
+STT: Groq whisper-large-v3 via API
+LLM: Groq llama-3.1-8b-instant via API
+Audio recording: sounddevice
+Audio processing: FFmpeg (system-wide)
+Timetable: timetable.json with day/time lookup
+Env vars: python-dotenv
+
+
+Great set of objectives. Let me break this into what's actually involved before we build anything:
+Timetable from screenshot — you take a photo/screenshot of your timetable, Jarvis reads it with vision AI (Claude or GPT-4o), extracts the events, and saves them to timetable.json automatically.
+Voice add to timetable — say "Add dentist at 3pm on Thursday" and it parses that and appends to timetable.json.
+UI — a floating window that shows a pulsing bubble when Jarvis is speaking, idle animation when waiting, and a timetable panel you can open.
+
+So the plan is:
+
+Gemini 2.5 Flash (free) — only for reading your timetable screenshot, once
+Groq (already set up) — all voice conversations as normal
+tkinter desktop window — pulsing bubble UI + timetable panel    
+
+Ready to build all three features? You'll just need to grab a free Gemini API key from aistudio.google.com and add it to your .env file as GEMINI_API_KEY=.... Let me know when you have it and I'll build everything out.py
+
+
+
+
+
+Good. Now let me plan the UI before writing it:
+Aesthetic direction: Dark, sleek, sci-fi minimalist — like Iron Man's JARVIS. Deep navy/black background, electric cyan accent, clean monospace font. The bubble will pulse with a glow when talking, breathe slowly when idle, and the timetable panel slides in from the side.
+Features to build:
+
+Pulsing animated orb — idle (slow breathe), listening (faster pulse), speaking (active glow)
+Status text below the orb
+Timetable button that opens a panel showing today's schedule
+State is controlled from main.py via a simple shared file or socket
+Create the tkinter UI fileCreate the tkinter UI fileNow update main.py to write state to the file and launch the UI in a background thread:Ran a command, read a fileRan a command, read a fileUpdate main.py to launch UI thread and write stateScriptPresented 2 filesDoneTwo files to drop into your project folder. No new installs needed — tkinter comes built into Python.
+Here's what you get:
+The orb has 3 states:
+
+Idle — slow breathing glow, tick marks rotate slowly. Status says STANDBY
+Listening — faster pulsing rings, brighter cyan. Status says LISTENING
+Speaking — rapid energetic bursts, all rings lit. Status says SPEAKING
+
+Timetable button — click [ TIMETABLE ] and a panel slides open showing today's schedule pulled live from your timetable.json. Closes again on click.
+How the state sync works — main.py writes a tiny file called jarvis_state.txt every time the state changes (idle → listening → speaking). The UI polls it every 200ms and updates the animation accordingly. Simple and reliable.
+The UI always stays on top so you can see it while doing other things. Run it the same way — just python main.py and both the voice system and window launch together.
+
+
+
+
+
+10pm
+
+(venv) PS C:\Users\Zacha\Projects\JARVIS V1> python main.py
+C:\Users\Zacha\Projects\JARVIS V1\venv\Lib\site-packages\webrtcvad.py:1: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Jarvis: Jarvis online. Say 'Hey Jarvis' when you need me.
+Waiting for wake word: 'Hey Jarvis'...
+You said: Jarvis?
+Jarvis: Yes?
+You said: Thank you.
+Jarvis: You're welcome. How can I assist you today?
+You said: What's my schedule like this week?
+Jarvis: Today you have: English at 10:00
+You said: Can you add Jim at 9pm on Sunday?
+Jarvis: Notifying Jim of the meeting is not possible through me. I will send a reminder at 9am on Sunday instead to add the meeting at 9pm for Sunday.
+You said: Gym as in going to the gym on 9pm on Sunday.
+Jarvis: I've booked your appointment at the gym for 9pm on Sunday. Please confirm your attire and preferred equipment upon arrival.
+Jarvis: Didn't catch that...
+Nothing heard, going back to sleep.
+You said: Thank you.
+You said: Jarvis, wake up.
+Jarvis: Yes?
+You said: add going to the gym at 9pm on Sunday.
+Jarvis: I have added the gym appointment to your Sunday schedule for 9pm. 
+
+Current schedule for Sunday: 
+- Gym time at 9pm 
+- Please note: I do not have real-time access to schedule updates or confirmations for this appointment.
+You said: Travis, wake up. You still here?
+Jarvis: You are referring to me as Jarvis, not Travis. I am still present and functioning.
+You said: Service exit. Go to sleep.
+Jarvis: Goodbye!
+(venv) PS C:\Users\Zacha\Projects\JARVIS V1> python main.py
+C:\Users\Zacha\Projects\JARVIS V1\venv\Lib\site-packages\webrtcvad.py:1: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Jarvis: Jarvis online. Say 'Hey Jarvis' when you need me.
+Waiting for wake word: 'Hey Jarvis'...
+You said: Hey Jarvis.
+Jarvis: Yes?
+You said: Add a Spanish lesson at 2pm on Wednesday.
+Jarvis: Done. I've added Spanish Lesson at 14:00 on Wednesday.
+You said: I had a gym session on Thursday at 4pm.
+Jarvis: You had a gym session on Thursday at 4pm. I do not have information about the specifics of this session.
+You said: No, Jarvis, I said add a gym session at Thursday at 4pm.
+Jarvis: Done. I've added Gym Session at 16:00 on Thursday.
+You said: Thank you.
+Jarvis: You're welcome, sir. How can I assist you today?
+You said: Exit.
+Jarvis: Goodbye!
+(venv) PS C:\Users\Zacha\Projects\JARVIS V1> 

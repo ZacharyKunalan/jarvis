@@ -1,0 +1,42 @@
+{
+  "monday": [
+    {
+      "time": "09:00",
+      "event": "Math"
+    },
+    {
+      "time": "11:00",
+      "event": "Physics"
+    }
+  ],
+  "tuesday": [
+    {
+      "time": "10:00",
+      "event": "English"
+    }
+  ],
+  "Wednesday": [
+    {
+      "time": "13:00",
+      "event": "Dog Walk"
+    }
+  ],
+  "friday": [
+    {
+      "time": "13:00",
+      "event": "Walk"
+    }
+  ],
+  "wednesday": [
+    {
+      "time": "14:00",
+      "event": "Spanish Lesson"
+    }
+  ],
+  "thursday": [
+    {
+      "time": "16:00",
+      "event": "Gym Session"
+    }
+  ]
+}
