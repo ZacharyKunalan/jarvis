@@ -54,7 +54,7 @@ def _capture_audio(max_silent_chunks=30):
     silent_chunks = 0
     speaking = False
 
-    with sd.RawInputStream(samplerate=sample_rate, channels=1, dtype="int16", blocksize=chunk_size) as stream:
+    with sd.RawInputStream(samplerate=sample_rate, channels=1, dtype="int16", blocksize=chunk_size, device=1) as stream:
         while True:
             chunk, _ = stream.read(chunk_size)
             is_speech = vad.is_speech(bytes(chunk), sample_rate)
@@ -69,17 +69,18 @@ def _capture_audio(max_silent_chunks=30):
                 if silent_chunks > max_silent_chunks:
                     break
 
-    return b"".join(frames) if frames else None
+    return b"".join(frames) if len(frames) > 3 else None
 
 # ------------------------
 # 🎤 TRANSCRIBE AUDIO
 # ------------------------
 
 def _transcribe(audio_bytes, min_words=1):
-    """
-    Saves audio bytes to a wav, sends to Groq Whisper, returns transcribed text.
-    min_words: minimum number of words required to return a result (1 for wake word, 2 for commands).
-    """
+    # Skip transcription if audio is too quiet (background noise)
+    audio_array = np.frombuffer(audio_bytes, dtype=np.int16)
+    if np.abs(audio_array).mean() < 20:
+        return ""
+
     with wave.open("input.wav", "w") as wf:
         wf.setnchannels(1)
         wf.setsampwidth(2)
@@ -88,9 +89,10 @@ def _transcribe(audio_bytes, min_words=1):
 
     with open("input.wav", "rb") as f:
         transcription = groq_client.audio.transcriptions.create(
-            model="whisper-large-v3",
+            model="whisper-large-v3-turbo",
             file=f,
-            language="en"
+            language="en",
+            prompt="Jarvis, exit, quit, goodbye, stop, yes, no, gym, schedule, timetable, weather, add, walk, reminder, what, when, today, tomorrow"
         )
 
     os.remove("input.wav")
@@ -99,7 +101,6 @@ def _transcribe(audio_bytes, min_words=1):
     if len(text.split()) < min_words:
         return ""
 
-    # Filter out hallucinated filler phrases from silence
     FILLER_PHRASES = ["thank you", "thanks", "you", "bye", "goodbye", "see you", "see you later"]
     if text.lower().strip(".!, ") in FILLER_PHRASES:
         return ""
@@ -114,10 +115,21 @@ def _transcribe(audio_bytes, min_words=1):
 # ------------------------
 
 def listen_for_wake_word():
-    audio = _capture_audio(max_silent_chunks=20)  # faster cutoff for wake word
-    if not audio:
-        return ""
-    return _transcribe(audio, min_words=1)  # allow single words
+    import openwakeword
+    from openwakeword.model import Model as WakeWordModel
+    oww_model = WakeWordModel(wakeword_models=["hey_jarvis_v0.1"], inference_framework="onnx")
+    
+    chunk_size = 1280  # required by openWakeWord
+    with sd.RawInputStream(samplerate=16000, channels=1, dtype="int16", blocksize=chunk_size) as stream:
+        while True:
+            chunk, _ = stream.read(chunk_size)
+            audio = np.frombuffer(bytes(chunk), dtype=np.int16)
+            prediction = oww_model.predict(audio)
+            score = prediction.get("hey_jarvis_v0.1", 0)
+            if score > 0.7:
+                oww_model.reset()
+                return "hey jarvis"
+            
 
 # ------------------------
 # 🎤 COMMAND LISTENER

@@ -1,36 +1,44 @@
 import tkinter as tk
-from tkinter import font
 import math
 import json
 import os
-import threading
+import random
 from datetime import datetime
 
-# ── Colour palette ───────────────────────────────────────────────────────────
-BG          = "#05080f"
-PANEL       = "#090e1a"
-BORDER      = "#0f1e35"
-ACCENT      = "#00c8f0"
-ACCENT_DIM  = "#003d52"
-ACCENT_GLOW = "#00eaff"
-AMBER       = "#f0a500"
-AMBER_DIM   = "#3d2900"
-RED         = "#ff3b5c"
-WHITE       = "#d6edf5"
-GREY        = "#2a4460"
-GREY_LT     = "#4a6880"
-SUCCESS     = "#00e5a0"
+# ── Colour palette ────────────────────────────────────────────────────────────
+BG           = "#070b14"
+PANEL        = "#0b1220"
+PANEL_LT     = "#101a2e"
+BORDER       = "#1e3a5f"
+BORDER_LT    = "#2a5080"
+ACCENT       = "#00d4ff"
+ACCENT_DIM   = "#00506a"
+ACCENT_GLOW  = "#80eeff"
+ACCENT2      = "#0088cc"
+AMBER        = "#ffb700"
+AMBER_DIM    = "#4d3800"
+AMBER_GLOW   = "#ffd060"
+RED          = "#ff3b5c"
+WHITE        = "#e8f6ff"
+WHITE_DIM    = "#a0c8e0"
+GREY         = "#1e3a55"
+GREY_LT      = "#4a7a9a"
+GREY_MD      = "#2e5070"
+SUCCESS      = "#00ffb0"
+SUCCESS_DIM  = "#005040"
 
-# ── Fonts ────────────────────────────────────────────────────────────────────
-F_MONO_LG   = ("Courier New", 13, "bold")
-F_MONO_MD   = ("Courier New", 10)
-F_MONO_SM   = ("Courier New", 8)
-F_MONO_XS   = ("Courier New", 7)
+# ── Fonts ─────────────────────────────────────────────────────────────────────
+F_TITLE      = ("Courier New", 13, "bold")
+F_MAIN       = ("Courier New", 11, "bold")
+F_MED        = ("Courier New", 10)
+F_SMALL      = ("Courier New", 9)
+F_XS         = ("Courier New", 8)
+F_STATUS     = ("Courier New", 18, "bold")
 
-STATE_FILE  = "jarvis_state.txt"
-W, H        = 380, 560
+STATE_FILE   = "jarvis_state.txt"
+W, H         = 460, 660
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+
 def load_timetable():
     try:
         with open("timetable.json") as f:
@@ -59,148 +67,200 @@ class JarvisUI:
         self.tick           = 0
         self.timetable_open = False
         self._last_mtime    = None
-        self._particles     = []
+        self._particle_pool = []
 
         self._build_ui()
         self._animate()
         self._poll_state()
         self._watch_timetable()
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # BUILD UI
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── BUILD UI ──────────────────────────────────────────────────────────────
     def _build_ui(self):
-        # ── Top bar ──────────────────────────────────────────────────────────
-        bar = tk.Frame(self.root, bg=PANEL, height=44)
+
+        # ── Top bar ───────────────────────────────────────────────────────────
+        bar = tk.Frame(self.root, bg=PANEL, height=52)
         bar.pack(fill="x")
         bar.pack_propagate(False)
 
-        tk.Label(bar, text="◈", bg=PANEL, fg=ACCENT,
-                 font=("Courier New", 14, "bold")).pack(side="left", padx=(16, 6), pady=10)
-        tk.Label(bar, text="J.A.R.V.I.S", bg=PANEL, fg=WHITE,
-                 font=("Courier New", 12, "bold")).pack(side="left", pady=10)
+        # Left side — logo
+        left = tk.Frame(bar, bg=PANEL)
+        left.pack(side="left", padx=18, pady=8)
+        tk.Label(left, text="◈", bg=PANEL, fg=ACCENT,
+                 font=("Courier New", 16, "bold")).pack(side="left", padx=(0, 8))
+        title_col = tk.Frame(left, bg=PANEL)
+        title_col.pack(side="left")
+        tk.Label(title_col, text="J.A.R.V.I.S", bg=PANEL, fg=WHITE,
+                 font=F_TITLE).pack(anchor="w")
+        tk.Label(title_col, text="PERSONAL INTELLIGENCE SYSTEM", bg=PANEL,
+                 fg=GREY_LT, font=F_XS).pack(anchor="w")
 
-        # Status dot (right side)
-        self.dot_indicator = tk.Canvas(bar, width=10, height=10,
-                                       bg=PANEL, highlightthickness=0)
-        self.dot_indicator.pack(side="right", padx=(0, 16), pady=17)
-        self._status_dot = self.dot_indicator.create_oval(0, 0, 9, 9,
-                                                          fill=ACCENT, outline="")
+        # Right side — indicators
+        right = tk.Frame(bar, bg=PANEL)
+        right.pack(side="right", padx=18, pady=8)
+        tk.Label(right, text="v2.0", bg=PANEL, fg=GREY_LT, font=F_XS).pack(anchor="e")
+        self.dot_canvas = tk.Canvas(right, width=12, height=12,
+                                    bg=PANEL, highlightthickness=0)
+        self.dot_canvas.pack(anchor="e", pady=(4, 0))
+        self._status_dot = self.dot_canvas.create_oval(1, 1, 11, 11,
+                                                       fill=ACCENT, outline=ACCENT_GLOW,
+                                                       width=1)
 
-        tk.Label(bar, text="v1.0", bg=PANEL, fg=GREY_LT,
-                 font=F_MONO_XS).pack(side="right", padx=(0, 6), pady=10)
-
-        # Thin accent line under bar
+        # Separator
         tk.Frame(self.root, bg=ACCENT_DIM, height=1).pack(fill="x")
 
-        # ── Canvas (orb) ─────────────────────────────────────────────────────
-        self.canvas = tk.Canvas(self.root, width=W, height=240,
+        # ── System stats bar ─────────────────────────────────────────────────
+        stats_bar = tk.Frame(self.root, bg=PANEL_LT, height=28)
+        stats_bar.pack(fill="x")
+        stats_bar.pack_propagate(False)
+
+        self._stat_items = []
+        stats = [("SYS", "ONLINE"), ("NET", "ACTIVE"), ("AI", "GROQ/v3"), ("MIC", "LIVE")]
+        for label, val in stats:
+            f = tk.Frame(stats_bar, bg=PANEL_LT)
+            f.pack(side="left", padx=18, pady=4)
+            tk.Label(f, text=label, bg=PANEL_LT, fg=GREY_LT, font=F_XS).pack(side="left")
+            tk.Label(f, text=" · ", bg=PANEL_LT, fg=GREY, font=F_XS).pack(side="left")
+            lbl = tk.Label(f, text=val, bg=PANEL_LT, fg=ACCENT, font=F_XS)
+            lbl.pack(side="left")
+            self._stat_items.append(lbl)
+
+        tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x")
+
+        # ── Orb canvas ───────────────────────────────────────────────────────
+        self.canvas = tk.Canvas(self.root, width=W, height=300,
                                 bg=BG, highlightthickness=0)
         self.canvas.pack()
 
-        cx, cy = W // 2, 120
+        cx, cy = W // 2, 150
         self.cx, self.cy = cx, cy
 
-        # Decorative corner marks
-        for x, y, a1, a2 in [(20, 20, 0, 90), (W-20, 20, 90, 180),
-                              (20, 220, 270, 360), (W-20, 220, 180, 270)]:
-            self.canvas.create_arc(x-12, y-12, x+12, y+12,
-                                   start=a1, extent=90,
-                                   outline=GREY, width=1, style="arc")
+        # Background grid
+        for yy in range(0, 300, 20):
+            alpha = "#0a0f1c" if yy % 40 == 0 else "#080c18"
+            self.canvas.create_line(0, yy, W, yy, fill=alpha, width=1)
+        for xx in range(0, W, 40):
+            self.canvas.create_line(xx, 0, xx, 300, fill="#080c18", width=1)
 
-        # Scanline texture (subtle horizontal lines)
-        for yy in range(0, 240, 6):
-            self.canvas.create_line(0, yy, W, yy, fill="#0a0f1c", width=1)
+        # Corner brackets
+        bsize = 18
+        for bx, by, signs in [(28, 28, (1,1)), (W-28, 28, (-1,1)),
+                               (28, 272, (1,-1)), (W-28, 272, (-1,-1))]:
+            sx, sy = signs
+            self.canvas.create_line(bx, by, bx + sx*bsize, by,
+                                    fill=ACCENT_DIM, width=2)
+            self.canvas.create_line(bx, by, bx, by + sy*bsize,
+                                    fill=ACCENT_DIM, width=2)
 
-        # Orbit rings
-        self.ring_outer = self.canvas.create_oval(
-            cx-95, cy-95, cx+95, cy+95, outline=BORDER, width=1)
-        self.ring_mid   = self.canvas.create_oval(
-            cx-70, cy-70, cx+70, cy+70, outline=ACCENT_DIM, width=1)
-        self.ring_inner = self.canvas.create_oval(
-            cx-50, cy-50, cx+50, cy+50, outline=ACCENT, width=1, dash=(4, 4))
+        # Outer decorative rings
+        self.ring_xl  = self.canvas.create_oval(cx-118, cy-118, cx+118, cy+118,
+                                                outline=GREY, width=1)
+        self.ring_outer = self.canvas.create_oval(cx-100, cy-100, cx+100, cy+100,
+                                                  outline=BORDER_LT, width=1)
+        self.ring_mid = self.canvas.create_oval(cx-78, cy-78, cx+78, cy+78,
+                                                outline=ACCENT_DIM, width=1)
+        self.ring_inner = self.canvas.create_oval(cx-58, cy-58, cx+58, cy+58,
+                                                  outline=ACCENT, width=1, dash=(5, 3))
 
         # Orb body
-        self.orb = self.canvas.create_oval(
-            cx-38, cy-38, cx+38, cy+38,
-            fill="#010a12", outline=ACCENT, width=2)
+        self.orb = self.canvas.create_oval(cx-44, cy-44, cx+44, cy+44,
+                                           fill="#010a14", outline=ACCENT, width=2)
 
-        # Centre dot
-        self.core = self.canvas.create_oval(
-            cx-7, cy-7, cx+7, cy+7, fill=ACCENT, outline="")
+        # Orb inner glow
+        self.orb_glow = self.canvas.create_oval(cx-30, cy-30, cx+30, cy+30,
+                                                fill="#011520", outline=ACCENT_DIM, width=1)
 
-        # Tick marks around orbit
+        # Core dot
+        self.core = self.canvas.create_oval(cx-8, cy-8, cx+8, cy+8,
+                                            fill=ACCENT, outline=ACCENT_GLOW, width=1)
+
+        # Data arc
+        self.data_arc = self.canvas.create_arc(cx-52, cy-52, cx+52, cy+52,
+                                               start=90, extent=270,
+                                               outline=ACCENT, width=2, style="arc")
+
+        # Secondary arc
+        self.data_arc2 = self.canvas.create_arc(cx-90, cy-90, cx+90, cy+90,
+                                                start=45, extent=180,
+                                                outline=ACCENT2, width=1, style="arc",
+                                                dash=(6, 4))
+
+        # Tick marks
         self.tick_items = []
-        for i in range(24):
-            angle = math.radians(i * 15)
-            length = 8 if i % 6 == 0 else 4
-            x1 = cx + 53 * math.cos(angle)
-            y1 = cy + 53 * math.sin(angle)
-            x2 = cx + (53 + length) * math.cos(angle)
-            y2 = cy + (53 + length) * math.sin(angle)
-            col = GREY_LT if i % 6 == 0 else GREY
-            item = self.canvas.create_line(x1, y1, x2, y2, fill=col, width=1)
+        for i in range(32):
+            angle  = math.radians(i * (360 / 32))
+            length = 10 if i % 8 == 0 else (6 if i % 4 == 0 else 3)
+            r_base = 62
+            x1 = cx + r_base * math.cos(angle)
+            y1 = cy + r_base * math.sin(angle)
+            x2 = cx + (r_base + length) * math.cos(angle)
+            y2 = cy + (r_base + length) * math.sin(angle)
+            col  = ACCENT if i % 8 == 0 else (GREY_LT if i % 4 == 0 else GREY)
+            w    = 2 if i % 8 == 0 else 1
+            item = self.canvas.create_line(x1, y1, x2, y2, fill=col, width=w)
             self.tick_items.append(item)
 
-        # Data arc (progress-style arc around orb)
-        self.data_arc = self.canvas.create_arc(
-            cx-45, cy-45, cx+45, cy+45,
-            start=90, extent=270,
-            outline=ACCENT, width=2, style="arc")
-
-        # Particle pool (pre-create invisible dots)
-        self._particle_items = []
-        for _ in range(18):
+        # Particle pool
+        for _ in range(24):
             item = self.canvas.create_oval(0, 0, 0, 0, fill=ACCENT, outline="")
-            self._particle_items.append({"item": item, "active": False,
-                                         "x": 0.0, "y": 0.0,
-                                         "vx": 0.0, "vy": 0.0,
-                                         "life": 0, "max_life": 1})
+            self._particle_pool.append({
+                "item": item, "active": False,
+                "x": 0.0, "y": 0.0, "vx": 0.0, "vy": 0.0,
+                "life": 0, "max_life": 1, "col": ACCENT
+            })
 
-        # ── Status area ───────────────────────────────────────────────────────
-        status_frame = tk.Frame(self.root, bg=BG)
-        status_frame.pack(pady=(0, 2))
+        # ── Status section ───────────────────────────────────────────────────
+        tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x")
+
+        status_outer = tk.Frame(self.root, bg=BG)
+        status_outer.pack(fill="x", padx=24, pady=(14, 6))
+
+        # Status row
+        status_row = tk.Frame(status_outer, bg=BG)
+        status_row.pack(fill="x")
 
         self.status_var = tk.StringVar(value="STANDBY")
-        self.status_lbl = tk.Label(status_frame, textvariable=self.status_var,
-                                   bg=BG, fg=ACCENT,
-                                   font=("Courier New", 15, "bold"))
-        self.status_lbl.pack()
+        self.status_lbl = tk.Label(status_row, textvariable=self.status_var,
+                                   bg=BG, fg=ACCENT, font=F_STATUS)
+        self.status_lbl.pack(side="left")
+
+        # Blinking cursor
+        self.cursor_lbl = tk.Label(status_row, text="█", bg=BG, fg=ACCENT,
+                                   font=F_STATUS)
+        self.cursor_lbl.pack(side="left", padx=(4, 0))
 
         self.sub_var = tk.StringVar(value="Awaiting wake word  ·  say 'Hey Jarvis'")
-        tk.Label(status_frame, textvariable=self.sub_var,
-                 bg=BG, fg=GREY_LT, font=F_MONO_SM).pack(pady=(2, 0))
+        tk.Label(status_outer, textvariable=self.sub_var,
+                 bg=BG, fg=GREY_LT, font=F_SMALL).pack(anchor="w", pady=(2, 0))
 
         # ── Divider ───────────────────────────────────────────────────────────
         div = tk.Frame(self.root, bg=BG)
-        div.pack(fill="x", padx=24, pady=10)
-        tk.Frame(div, bg=ACCENT_DIM, height=1).pack(fill="x")
+        div.pack(fill="x", padx=24, pady=8)
+        tk.Frame(div, bg=BORDER_LT, height=1).pack(fill="x")
 
-        # ── Info row ──────────────────────────────────────────────────────────
+        # ── Clock / date row ─────────────────────────────────────────────────
         info_row = tk.Frame(self.root, bg=BG)
-        info_row.pack(fill="x", padx=28, pady=(0, 8))
+        info_row.pack(fill="x", padx=28, pady=(0, 10))
 
         self.clock_var = tk.StringVar()
         tk.Label(info_row, textvariable=self.clock_var,
-                 bg=BG, fg=GREY_LT, font=F_MONO_XS).pack(side="left")
+                 bg=BG, fg=GREY_LT, font=F_XS).pack(side="left")
 
         self.today_var = tk.StringVar()
         tk.Label(info_row, textvariable=self.today_var,
-                 bg=BG, fg=GREY_LT, font=F_MONO_XS).pack(side="right")
+                 bg=BG, fg=GREY_LT, font=F_XS).pack(side="right")
 
         self._update_clock()
 
         # ── Buttons ───────────────────────────────────────────────────────────
         btn_row = tk.Frame(self.root, bg=BG)
-        btn_row.pack(pady=(0, 8))
+        btn_row.pack(pady=(0, 10))
 
-        self.tt_btn = self._make_button(btn_row, "⊞  TIMETABLE",
-                                        self._toggle_timetable)
+        self.tt_btn = self._make_button(btn_row, "⊞  TIMETABLE", self._toggle_timetable)
         self.tt_btn.pack(side="left", padx=6)
 
         # ── Timetable panel ───────────────────────────────────────────────────
         self.tt_frame = tk.Frame(self.root, bg=PANEL,
-                                 highlightbackground=BORDER,
+                                 highlightbackground=BORDER_LT,
                                  highlightthickness=1)
         inner = tk.Frame(self.tt_frame, bg=PANEL)
         inner.pack(fill="both", expand=True, padx=1, pady=1)
@@ -209,8 +269,8 @@ class JarvisUI:
                                  bg=PANEL, troughcolor=BG,
                                  activebackground=ACCENT, width=6)
         self.tt_text = tk.Text(
-            inner, bg=PANEL, fg=WHITE, font=F_MONO_SM,
-            relief="flat", height=9, width=38,
+            inner, bg=PANEL, fg=WHITE, font=F_SMALL,
+            relief="flat", height=9, width=44,
             state="disabled", padx=14, pady=10,
             yscrollcommand=scrollbar.set, wrap="word",
             cursor="arrow", insertbackground=ACCENT
@@ -219,46 +279,38 @@ class JarvisUI:
         self.tt_text.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        self.tt_text.tag_config("today_hdr",
-                                foreground=ACCENT,
-                                font=("Courier New", 8, "bold"))
-        self.tt_text.tag_config("other_hdr",
-                                foreground=GREY_LT,
-                                font=("Courier New", 8, "bold"))
-        self.tt_text.tag_config("event",  foreground=WHITE,  font=F_MONO_SM)
-        self.tt_text.tag_config("empty",  foreground=GREY,   font=F_MONO_SM)
-        self.tt_text.tag_config("time_col", foreground=AMBER, font=F_MONO_SM)
+        self.tt_text.tag_config("today_hdr", foreground=ACCENT,
+                                font=("Courier New", 9, "bold"))
+        self.tt_text.tag_config("other_hdr", foreground=GREY_LT,
+                                font=("Courier New", 9, "bold"))
+        self.tt_text.tag_config("event",   foreground=WHITE,     font=F_SMALL)
+        self.tt_text.tag_config("empty",   foreground=GREY_LT,   font=F_SMALL)
+        self.tt_text.tag_config("time_col", foreground=AMBER_GLOW, font=F_SMALL)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # BUTTON FACTORY
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── BUTTON FACTORY ────────────────────────────────────────────────────────
     def _make_button(self, parent, text, cmd):
         btn = tk.Button(
             parent, text=text,
-            bg=PANEL, fg=ACCENT,
+            bg=PANEL_LT, fg=ACCENT,
             activebackground=ACCENT, activeforeground=BG,
-            font=F_MONO_SM, relief="flat", bd=0,
-            padx=14, pady=7, cursor="hand2",
-            highlightbackground=BORDER,
+            font=F_SMALL, relief="flat", bd=0,
+            padx=18, pady=9, cursor="hand2",
+            highlightbackground=BORDER_LT,
             highlightthickness=1,
             command=cmd
         )
         btn.bind("<Enter>", lambda e: btn.config(bg=ACCENT_DIM, fg=ACCENT_GLOW))
-        btn.bind("<Leave>", lambda e: btn.config(bg=PANEL, fg=ACCENT))
+        btn.bind("<Leave>", lambda e: btn.config(bg=PANEL_LT, fg=ACCENT))
         return btn
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # CLOCK
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── CLOCK ─────────────────────────────────────────────────────────────────
     def _update_clock(self):
         now = datetime.now()
         self.clock_var.set(now.strftime("%H:%M:%S"))
         self.today_var.set(now.strftime("%a  %d %b %Y").upper())
         self.root.after(1000, self._update_clock)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # TIMETABLE PANEL
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── TIMETABLE ─────────────────────────────────────────────────────────────
     def _toggle_timetable(self):
         if self.timetable_open:
             self.tt_frame.pack_forget()
@@ -267,10 +319,10 @@ class JarvisUI:
             self.root.geometry(f"{W}x{H}")
         else:
             self._refresh_timetable()
-            self.tt_frame.pack(padx=16, pady=(0, 12), fill="x")
+            self.tt_frame.pack(padx=16, pady=(0, 14), fill="x")
             self.timetable_open = True
             self.tt_btn.config(text="⊟  CLOSE")
-            self.root.geometry(f"{W}x{H + 200}")
+            self.root.geometry(f"{W}x{H + 220}")
 
     def _refresh_timetable(self):
         DAYS  = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
@@ -281,10 +333,10 @@ class JarvisUI:
         self.tt_text.delete("1.0", "end")
 
         for day in DAYS:
-            events = data.get(day, [])
+            events   = data.get(day, [])
             is_today = day == today
-            tag = "today_hdr" if is_today else "other_hdr"
-            marker = "▶ " if is_today else "  "
+            tag      = "today_hdr" if is_today else "other_hdr"
+            marker   = "▶ " if is_today else "  "
             self.tt_text.insert("end",
                 f"{marker}── {day.upper()} {'(TODAY)' if is_today else '─'*8}\n", tag)
             if events:
@@ -314,29 +366,28 @@ class JarvisUI:
             pass
         self.root.after(1000, self._watch_timetable)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # PARTICLES
-    # ─────────────────────────────────────────────────────────────────────────
-    def _spawn_particle(self):
-        import random
-        for p in self._particle_items:
+    # ── PARTICLES ─────────────────────────────────────────────────────────────
+    def _spawn_particle(self, col=None):
+        for p in self._particle_pool:
             if not p["active"]:
-                angle = random.uniform(0, 2 * math.pi)
-                speed = random.uniform(0.8, 2.2)
-                p["active"]   = True
-                p["x"]        = float(self.cx)
-                p["y"]        = float(self.cy)
-                p["vx"]       = math.cos(angle) * speed
-                p["vy"]       = math.sin(angle) * speed
-                p["life"]     = 0
-                p["max_life"] = random.randint(25, 50)
+                angle       = random.uniform(0, 2 * math.pi)
+                speed       = random.uniform(0.6, 2.5)
+                p["active"] = True
+                p["x"]      = float(self.cx)
+                p["y"]      = float(self.cy)
+                p["vx"]     = math.cos(angle) * speed
+                p["vy"]     = math.sin(angle) * speed
+                p["life"]   = 0
+                p["max_life"] = random.randint(30, 60)
+                p["col"]    = col or ACCENT
                 break
 
     def _update_particles(self, state):
-        if state in ("listening", "speaking") and self.tick % 4 == 0:
-            self._spawn_particle()
+        col = AMBER if state == "speaking" else (SUCCESS if state == "listening" else ACCENT)
+        if state in ("listening", "speaking", "wake") and self.tick % 3 == 0:
+            self._spawn_particle(col)
 
-        for p in self._particle_items:
+        for p in self._particle_pool:
             if not p["active"]:
                 self.canvas.coords(p["item"], 0, 0, 0, 0)
                 continue
@@ -348,154 +399,168 @@ class JarvisUI:
                 continue
             p["x"] += p["vx"]
             p["y"] += p["vy"]
-            size = max(1, 3 * (1 - ratio))
+            p["vy"] += 0.02  # subtle gravity
+            size = max(1, 4 * (1 - ratio))
             x, y = p["x"], p["y"]
             self.canvas.coords(p["item"], x-size, y-size, x+size, y+size)
-            # Fade colour
-            col = self._blend(ACCENT, BG, ratio ** 0.5)
-            self.canvas.itemconfig(p["item"], fill=col)
+            blended = self._blend(p["col"], BG, ratio ** 0.6)
+            self.canvas.itemconfig(p["item"], fill=blended)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # ANIMATION
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── ANIMATION ─────────────────────────────────────────────────────────────
     def _animate(self):
         self.tick += 1
-        t     = self.tick
+        t      = self.tick
         cx, cy = self.cx, self.cy
         state  = self.state
 
-        # ── State-driven visuals ──────────────────────────────────────────────
+        # Cursor blink
+        self.cursor_lbl.config(fg=ACCENT if (t // 18) % 2 == 0 else BG)
+
         if state == "idle":
-            pulse  = 0.3 + 0.12 * math.sin(t * 0.03)
-            r      = 38 + 3  * math.sin(t * 0.03)
-            glow   = self._blend(ACCENT_DIM, ACCENT, pulse)
-            self.canvas.itemconfig(self.ring_inner, outline=glow, dash=(4, 4))
-            self.canvas.itemconfig(self.ring_mid,   outline=ACCENT_DIM)
-            self.canvas.itemconfig(self.ring_outer, outline=BORDER)
-            self.canvas.itemconfig(self.orb,        outline=glow)
-            core_r = 5 + 2 * math.sin(t * 0.03)
-            arc_ext = 200 + 40 * math.sin(t * 0.02)
-            dot_col = ACCENT_DIM
-            rot_spd = 0.25
+            pulse    = 0.3 + 0.15 * math.sin(t * 0.025)
+            r        = 44 + 3 * math.sin(t * 0.025)
+            glow     = self._blend(ACCENT_DIM, ACCENT, pulse)
+            glow2    = self._blend(GREY, ACCENT_DIM, pulse)
+            arc_ext  = 200 + 50 * math.sin(t * 0.018)
+            arc_ext2 = 120 + 40 * math.sin(t * 0.012)
+            core_r   = 6 + 2 * math.sin(t * 0.025)
+            dot_col  = ACCENT_DIM
+            rot_spd  = 0.2
+            rot_spd2 = -0.12
 
         elif state == "wake":
-            pulse  = 0.7 + 0.3 * abs(math.sin(t * 0.1))
-            r      = 38 + 6  * abs(math.sin(t * 0.1))
-            glow   = self._blend(ACCENT, ACCENT_GLOW, pulse)
-            self.canvas.itemconfig(self.ring_inner, outline=ACCENT_GLOW, dash=())
-            self.canvas.itemconfig(self.ring_mid,   outline=glow)
-            self.canvas.itemconfig(self.ring_outer, outline=ACCENT_DIM)
-            self.canvas.itemconfig(self.orb,        outline=ACCENT_GLOW)
-            core_r = 7 + 3 * abs(math.sin(t * 0.1))
-            arc_ext = 300
-            dot_col = ACCENT_GLOW
-            rot_spd = 1.0
+            pulse    = 0.7 + 0.3 * abs(math.sin(t * 0.08))
+            r        = 44 + 8 * abs(math.sin(t * 0.08))
+            glow     = self._blend(ACCENT, ACCENT_GLOW, pulse)
+            glow2    = self._blend(ACCENT_DIM, ACCENT, pulse)
+            arc_ext  = 320
+            arc_ext2 = 200
+            core_r   = 8 + 4 * abs(math.sin(t * 0.08))
+            dot_col  = ACCENT_GLOW
+            rot_spd  = 1.2
+            rot_spd2 = -0.6
 
         elif state == "listening":
-            pulse  = 0.5 + 0.5 * abs(math.sin(t * 0.1))
-            r      = 38 + 8  * abs(math.sin(t * 0.1))
-            glow   = self._blend(ACCENT, ACCENT_GLOW, pulse)
-            self.canvas.itemconfig(self.ring_inner, outline=ACCENT_GLOW, dash=())
-            self.canvas.itemconfig(self.ring_mid,   outline=glow)
-            self.canvas.itemconfig(self.ring_outer, outline=self._blend(ACCENT_DIM, ACCENT, pulse * 0.4))
-            self.canvas.itemconfig(self.orb,        outline=ACCENT_GLOW)
-            core_r = 7 + 4 * abs(math.sin(t * 0.1))
-            arc_ext = 300 + 60 * abs(math.sin(t * 0.07))
-            dot_col = ACCENT_GLOW
-            rot_spd = 1.5
+            pulse    = 0.5 + 0.5 * abs(math.sin(t * 0.09))
+            r        = 44 + 10 * abs(math.sin(t * 0.09))
+            glow     = self._blend(ACCENT, SUCCESS, pulse)
+            glow2    = self._blend(ACCENT_DIM, SUCCESS_DIM, pulse)
+            arc_ext  = 300 + 60 * abs(math.sin(t * 0.06))
+            arc_ext2 = 180 + 80 * abs(math.sin(t * 0.04))
+            core_r   = 8 + 5 * abs(math.sin(t * 0.09))
+            dot_col  = SUCCESS
+            rot_spd  = 1.8
+            rot_spd2 = -0.9
 
         elif state == "speaking":
-            pulse  = abs(math.sin(t * 0.18))
-            r      = 38 + 10 * pulse
-            glow   = self._blend(ACCENT, AMBER, pulse)
-            self.canvas.itemconfig(self.ring_inner, outline=glow, dash=())
-            self.canvas.itemconfig(self.ring_mid,   outline=self._blend(ACCENT, AMBER, pulse * 0.6))
-            self.canvas.itemconfig(self.ring_outer, outline=ACCENT_DIM)
-            self.canvas.itemconfig(self.orb,        outline=glow)
-            core_r = 8 + 5 * pulse
-            arc_ext = 360 * pulse
-            dot_col = glow
-            rot_spd = 2.5
+            pulse    = abs(math.sin(t * 0.15))
+            r        = 44 + 12 * pulse
+            glow     = self._blend(ACCENT, AMBER, pulse)
+            glow2    = self._blend(ACCENT2, AMBER_DIM, pulse)
+            arc_ext  = 360 * pulse
+            arc_ext2 = 240 * abs(math.sin(t * 0.07))
+            core_r   = 9 + 6 * pulse
+            dot_col  = AMBER_GLOW
+            rot_spd  = 3.0
+            rot_spd2 = -1.5
 
         else:
-            r, core_r, arc_ext, dot_col, rot_spd = 38, 5, 200, ACCENT, 0.25
+            r, glow, glow2, arc_ext, arc_ext2 = 44, ACCENT, ACCENT_DIM, 200, 120
+            core_r, dot_col, rot_spd, rot_spd2 = 6, ACCENT, 0.2, -0.12
 
-        # Orb resize
+        # Orb
         self.canvas.coords(self.orb, cx-r, cy-r, cx+r, cy+r)
+        self.canvas.itemconfig(self.orb, outline=glow)
+        self.canvas.coords(self.orb_glow, cx-(r*0.65), cy-(r*0.65),
+                           cx+(r*0.65), cy+(r*0.65))
+        self.canvas.itemconfig(self.orb_glow, outline=glow2)
 
-        # Core dot
+        # Rings
+        self.canvas.itemconfig(self.ring_inner, outline=glow, dash=(5, 3))
+        self.canvas.itemconfig(self.ring_mid,   outline=glow2)
+        self.canvas.itemconfig(self.ring_outer, outline=BORDER_LT)
+
+        # Core
         self.canvas.coords(self.core, cx-core_r, cy-core_r, cx+core_r, cy+core_r)
-        self.canvas.itemconfig(self.core, fill=dot_col)
+        self.canvas.itemconfig(self.core, fill=dot_col, outline=self._blend(dot_col, BG, 0.4))
 
-        # Data arc
+        # Arcs
         arc_start = (t * rot_spd * 2) % 360
-        self.canvas.itemconfig(self.data_arc, start=arc_start, extent=arc_ext)
+        self.canvas.itemconfig(self.data_arc, start=arc_start, extent=arc_ext,
+                               outline=glow)
+        arc_start2 = (t * rot_spd2 * 2 + 180) % 360
+        self.canvas.itemconfig(self.data_arc2, start=arc_start2, extent=arc_ext2,
+                               outline=glow2)
 
-        # Tick rotation
+        # Ticks
         offset = math.radians(t * rot_spd)
         for i, item in enumerate(self.tick_items):
-            angle  = offset + math.radians(i * 15)
-            length = 8 if i % 6 == 0 else 4
-            x1 = cx + 53 * math.cos(angle)
-            y1 = cy + 53 * math.sin(angle)
-            x2 = cx + (53 + length) * math.cos(angle)
-            y2 = cy + (53 + length) * math.sin(angle)
+            angle  = offset + math.radians(i * (360 / 32))
+            length = 10 if i % 8 == 0 else (6 if i % 4 == 0 else 3)
+            r_base = 62
+            x1 = cx + r_base * math.cos(angle)
+            y1 = cy + r_base * math.sin(angle)
+            x2 = cx + (r_base + length) * math.cos(angle)
+            y2 = cy + (r_base + length) * math.sin(angle)
+            col = glow if i % 8 == 0 else (GREY_LT if i % 4 == 0 else GREY)
             self.canvas.coords(item, x1, y1, x2, y2)
+            self.canvas.itemconfig(item, fill=col)
 
         # Particles
         self._update_particles(state)
 
-        # Status dot colour
+        # Status dot
         dot_map = {"idle": GREY_LT, "wake": ACCENT_GLOW,
-                   "listening": SUCCESS, "speaking": AMBER}
-        self.dot_indicator.itemconfig(
-            self._status_dot, fill=dot_map.get(state, GREY_LT))
+                   "listening": SUCCESS, "speaking": AMBER_GLOW}
+        self.dot_canvas.itemconfig(self._status_dot,
+                                   fill=dot_map.get(state, GREY_LT),
+                                   outline=dot_map.get(state, GREY_LT))
 
-        self.root.after(28, self._animate)
+        self.root.after(25, self._animate)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # COLOUR BLEND
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── COLOUR BLEND ──────────────────────────────────────────────────────────
     def _blend(self, hex1, hex2, t):
-        t = max(0.0, min(1.0, t))
-        r1,g1,b1 = int(hex1[1:3],16), int(hex1[3:5],16), int(hex1[5:7],16)
-        r2,g2,b2 = int(hex2[1:3],16), int(hex2[3:5],16), int(hex2[5:7],16)
-        return f"#{int(r1+(r2-r1)*t):02x}{int(g1+(g2-g1)*t):02x}{int(b1+(b2-b1)*t):02x}"
+        t  = max(0.0, min(1.0, t))
+        r1, g1, b1 = int(hex1[1:3],16), int(hex1[3:5],16), int(hex1[5:7],16)
+        r2, g2, b2 = int(hex2[1:3],16), int(hex2[3:5],16), int(hex2[5:7],16)
+        return (f"#{int(r1+(r2-r1)*t):02x}"
+                f"{int(g1+(g2-g1)*t):02x}"
+                f"{int(b1+(b2-b1)*t):02x}")
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # STATE POLLING
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── STATE POLLING ─────────────────────────────────────────────────────────
     def _poll_state(self):
         new_state = read_state()
         if new_state != self.state:
             self.state = new_state
             labels = {
                 "idle":      ("STANDBY",   "Awaiting wake word  ·  say 'Hey Jarvis'"),
-                "wake":      ("ALERT",     "Wake word detected!"),
+                "wake":      ("ALERT",     "Wake word detected  ·  initialising..."),
                 "listening": ("LISTENING", "Speak your command..."),
-                "speaking":  ("SPEAKING",  "Processing response..."),
+                "speaking":  ("SPEAKING",  "Processing  ·  please wait..."),
             }
             title, sub = labels.get(new_state, ("STANDBY", ""))
             self.status_var.set(title)
             self.sub_var.set(sub)
 
-            # Colour the status label
-            col_map = {"idle": ACCENT, "wake": ACCENT_GLOW,
-                       "listening": SUCCESS, "speaking": AMBER}
+            col_map = {
+                "idle":      ACCENT,
+                "wake":      ACCENT_GLOW,
+                "listening": SUCCESS,
+                "speaking":  AMBER_GLOW,
+            }
             self.status_lbl.config(fg=col_map.get(new_state, ACCENT))
+            self.cursor_lbl.config(fg=col_map.get(new_state, ACCENT))
 
         self.root.after(200, self._poll_state)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# LAUNCH
-# ─────────────────────────────────────────────────────────────────────────────
+# ── LAUNCH ────────────────────────────────────────────────────────────────────
 _root_ref = None
 
 def launch():
     global _root_ref
-    root     = tk.Tk()
-    app      = JarvisUI(root)
+    root      = tk.Tk()
+    app       = JarvisUI(root)
     _root_ref = root
     root.mainloop()
 

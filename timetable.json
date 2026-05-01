@@ -52,5 +52,11 @@
       "time": "12:00",
       "event": "Walk"
     }
+  ],
+  "sunday": [
+    {
+      "time": "08:00",
+      "event": "Gym Session"
+    }
   ]
 }

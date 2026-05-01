@@ -15,33 +15,111 @@
  - Timetable panel (all 7 days, scrollable)
  - Live panel refresh when timetable changes
  - Window closes on "exit"
+ - Weather (Open-Meteo, Guildford, Surrey)
+ - Wake word upgrade (openWakeWord, hey_jarvis)
+ - Whisper accuracy improvements
+ - UI overhaul (larger, brighter, stats bar)
+ - Timetable follow-up listen for missing time
 
 ───────────────────────────────────────
   UP NEXT
 ───────────────────────────────────────
 
- 1. Weather
-    - Open-Meteo API (free, no key needed)
-    - "What's the weather today / tomorrow?"
-    - Route weather questions through intent system
+ 1. Fix timetable specific day queries
+    - "What do I have on Saturday?" returns
+      today's schedule instead of Saturday
+    - Fix handle_timetable() day parsing
 
- 2. Timetable from screenshot
+ 2. Reminders / countdown to next event
+    - "Remind me about X in 10 minutes"
+    - Countdown timer to next timetable event
+    - Background thread watches for due reminders
+
+ 3. Conversation memory
+    - "What did I ask earlier?"
+    - Store last N exchanges in memory
+    - Pass history context to Groq LLM
+
+ 4. TTS voice upgrade
+    - Try Piper TTS (free, local, better quality)
+    - Or ElevenLabs free tier for premium voice
+    - Swap out async_speak() only
+
+ 5. System tray mode
+    - Minimise to taskbar instead of closing
+    - Run Jarvis silently in background
+    - Click tray icon to restore window
+
+───────────────────────────────────────
+  BLOCKED
+───────────────────────────────────────
+
+ - Timetable from screenshot
     - Upload photo of timetable
     - Gemini vision API reads it
     - Auto-populates timetable.json
     - Blocked until age verification sorted
 
- 3. Wake word upgrade
-    - Replace current keyword detection
-      with Porcupine (pvporcupine)
-    - More accurate, lower CPU, always-on
-
 ───────────────────────────────────────
   IDEAS FOR LATER
 ───────────────────────────────────────
 
- - Reminders / countdown to next event
- - "What did I ask earlier?" (conversation memory)
- - ElevenLabs voice upgrade
  - Porcupine custom wake word (your own voice)
- - System tray mode (minimise to taskbar)
+ - Further Whisper accuracy improvements
+ - "What's the weather in X city?" (multi-city)
+ - ElevenLabs premium voice (if free tier enough)
+
+ ───────────────────────────────────────
+  EMAIL ASSISTANT (PLANNED)
+───────────────────────────────────────
+
+ Phase 1 — Email Reading (IMAP)
+    - Connect Gmail via IMAP + App Password
+    - Connect Outlook via IMAP
+    - Fetch unread emails on voice command
+    - Strip to plain text for LLM parsing
+    - "Hey Jarvis, any new emails?"
+    - "Do I have anything from [name]?"
+
+ Phase 2 — Summarisation
+    - Pass email text to Groq LLaMA
+    - Read 1-2 sentence summary aloud
+    - "Summarise my emails from today"
+    - Support follow-up: "read the full one"
+
+ Phase 3 — Actions
+    - Voice delete: "delete it"
+    - Voice archive: "keep it"
+    - Voice reply (draft only, user confirms)
+    - Mark as read after summary
+
+ Phase 4 — Local LLM (Privacy Upgrade)
+    - Install Ollama on local machine
+    - RTX 3060 can run Llama 3.1 8B or
+      Mistral 7B comfortably at good speed
+    - Swap Groq email summarisation for
+      local Ollama — emails never leave PC
+    - General commands still use Groq
+      (no personal data involved there)
+
+ Phase 5 — Fine-tuning (Advanced)
+    - Fine-tune Mistral 7B or Llama 3.1 8B
+      on your own email style/preferences
+    - Teaches model YOUR writing patterns
+    - Requires: Ollama + a few hours of
+      training on RTX 3060
+    - Makes replies feel personal, not generic
+
+───────────────────────────────────────
+  NOTES
+───────────────────────────────────────
+
+ - Gmail: enable IMAP + generate App Password
+   at myaccount.google.com/apppasswords
+ - Outlook: enable IMAP in settings
+ - imaplib is built into Python (no install)
+ - Ollama: free, open source, ollama.com
+ - RTX 3060 (12GB): can run 7-8B models
+   comfortably, 13B models at reduced speed
+ - Email text sent to Groq in Phase 2 only
+   — replaced by local in Phase 4

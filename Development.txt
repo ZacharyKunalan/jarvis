@@ -286,22 +286,95 @@ file changed and the panel is open, it auto-refreshes
 the content live — no need to close and reopen.
 
 ───────────────────────────────────────────────────────
+  SESSION 10 — Setup, Wake Word & UI Overhaul
+───────────────────────────────────────────────────────
+
+Goal: Get the project running on a fresh Windows install,
+improve wake word detection, add weather, and overhaul
+the UI.
+
+SETUP & DEPENDENCY FIXES:
+  - Cloned repo and set up Python venv
+  - Fixed requirements.txt formatting bug (python-dotenv
+    and pyttsx3 merged onto one line)
+  - Resolved webrtcvad incompatibility with Python 3.14
+    by creating a custom compatibility wrapper
+    (webrtcvad.Vad class mapped to _webrtcvad functions)
+  - Installed Microsoft C++ Build Tools for native
+    package compilation
+  - Installed setuptools to fix pkg_resources error
+
+WAKE WORD:
+  - Replaced Whisper-based wake word detection with
+    openWakeWord using hey_jarvis_v0.1.onnx model
+  - Runs fully locally, no API key required
+  - Much faster response, fewer false positives
+  - Added 0.5s delay after wake word before listening
+    to allow mic stream to settle
+
+WEATHER:
+  - Added Open-Meteo weather feature (free, no API key)
+  - Hardcoded to Guildford, Surrey (lat/lon)
+  - Supports today and tomorrow queries
+  - Returns condition, high/low temp, rainfall
+  - Added is_weather_query() intent detector
+  - Routed through main.py intent system
+
+WHISPER IMPROVEMENTS:
+  - Added filler phrase filter to _transcribe() to
+    block hallucinated phrases like "thank you"
+  - Added context prompt to Whisper with common
+    command words to reduce misrecognition
+  - Switched to whisper-large-v3-turbo model
+  - Explicitly set USB mic as device 1 in _capture_audio
+  - Added minimum frames check to avoid sending
+    tiny audio clips to Whisper
+  - Added "is it" to EXIT_WORDS (common mishear of exit)
+
+TIMETABLE:
+  - Added null time check in parse_timetable_entry()
+    prompt so LLM returns null instead of guessing
+  - Added follow-up listen in main.py when time is
+    missing — Jarvis asks for time then immediately
+    listens for the answer
+
+UI OVERHAUL (ui.py rebuilt from scratch):
+  - Window size increased to 460x660
+  - System stats bar added (SYS/NET/AI/MIC)
+  - Subtitle added under logo
+  - Larger orb (44px radius) with inner glow ring
+  - Second counter-rotating arc added for depth
+  - 32 tick marks with varying sizes (was 24)
+  - Blinking cursor next to status text
+  - Particle gravity effect added
+  - Brighter colour palette throughout
+  - Amber glow on speaking state
+
+───────────────────────────────────────────────────────
   CURRENT STACK (Full)
 ───────────────────────────────────────────────────────
 
   TTS:         edge-tts + playsound==1.2.2
                voice: en-GB-RyanNeural
-  STT:         Groq whisper-large-v3
+  STT:         Groq whisper-large-v3-turbo
   LLM:         Groq llama-3.1-8b-instant
-  Wake word:   keyword detection ("jarvis" in text)
-  Audio:       sounddevice + webrtcvad + FFmpeg
-  Timetable:   timetable.json + voice add
-  UI:          tkinter (animated orb, 7-day panel)
+  Wake word:   openWakeWord (hey_jarvis_v0.1.onnx)
+  Audio:       sounddevice + webrtcvad (custom wrapper)
+  Weather:     Open-Meteo API (Guildford, Surrey)
+  Timetable:   timetable.json + voice add + follow-up
+  UI:          tkinter (460x660, animated orb, stats bar)
   State sync:  jarvis_state.txt
   Env:         python-dotenv (.env)
 
 ───────────────────────────────────────────────────────
   UP NEXT
 ───────────────────────────────────────────────────────
+
+  - Reminders / countdown to next event
+  - Conversation memory ("what did I ask earlier?")
+  - ElevenLabs or Piper TTS voice upgrade
+  - System tray mode (minimise to taskbar)
+  - Fix timetable specific day queries
+  - Further Whisper accuracy improvements
 
   See plan.txt
