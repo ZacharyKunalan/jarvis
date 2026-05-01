@@ -6,6 +6,7 @@ import threading
 import time
 from logic import (is_timetable_query, handle_timetable,
                    is_add_timetable, add_to_timetable,
+                   is_weather_query, get_weather,
                    ask_ai, speak, listen_for_wake_word, listen)
 import ui
 from ui import launch
@@ -23,7 +24,7 @@ def is_exit(text):
 
 def run_jarvis():
     set_state("idle")
-    speak("Jarvis online. Say 'Hey Jarvis' or 'Jarvis wake up' when you need me.")
+    speak("Jarvis online. Ready Whenever you are Sir")
     print("Waiting for wake word: 'Hey Jarvis'...")
 
     while True:
@@ -75,6 +76,9 @@ def run_jarvis():
                         speak(response)
             elif is_timetable_query(text):
                 response = handle_timetable(text)
+                speak(response)
+            elif is_weather_query(text):
+                response = get_weather(text)
                 speak(response)
             else:
                 response = ask_ai(text)

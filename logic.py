@@ -10,6 +10,7 @@ import numpy as np
 from groq import Groq
 from dotenv import load_dotenv
 import webrtcvad
+import urllib.request
 
 load_dotenv()
 groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -259,6 +260,57 @@ def handle_timetable(text):
 
     else:
         return "I'm not sure which day you mean."
+
+
+# ------------------------
+# 🤖 AI (Weather)
+# ------------------------
+
+
+LATITUDE  = 51.2365
+LONGITUDE = -0.5703
+
+def get_weather(text):
+    url = (
+        f"https://api.open-meteo.com/v1/forecast"
+        f"?latitude={LATITUDE}&longitude={LONGITUDE}"
+        f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode"
+        f"&timezone=Europe/London"
+        f"&forecast_days=2"
+    )
+    with urllib.request.urlopen(url) as r:
+        data = json.loads(r.read())
+
+    daily = data["daily"]
+    
+    if "tomorrow" in text.lower():
+        idx = 1
+        day_label = "Tomorrow"
+    else:
+        idx = 0
+        day_label = "Today"
+
+    max_t = daily["temperature_2m_max"][idx]
+    min_t = daily["temperature_2m_min"][idx]
+    rain  = daily["precipitation_sum"][idx]
+    code  = daily["weathercode"][idx]
+
+    conditions = {
+        0: "clear skies", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
+        51: "light drizzle", 53: "drizzle", 61: "light rain", 63: "rain",
+        71: "light snow", 73: "snow", 80: "showers", 81: "heavy showers",
+        95: "thunderstorms"
+    }
+    condition = conditions.get(code, "mixed conditions")
+
+    return (f"{day_label} in Guildford: {condition}, "
+            f"high of {max_t}°C, low of {min_t}°C, "
+            f"with {rain}mm of rain expected.")
+
+def is_weather_query(text):
+    keywords = ["weather", "temperature", "rain", "forecast", "sunny", "cold", "warm"]
+    return any(word in text.lower() for word in keywords)
+
 
 # ------------------------
 # 🤖 AI (Groq LLM)
