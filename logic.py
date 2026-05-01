@@ -98,6 +98,11 @@ def _transcribe(audio_bytes, min_words=1):
     if len(text.split()) < min_words:
         return ""
 
+    # Filter out hallucinated filler phrases from silence
+    FILLER_PHRASES = ["thank you", "thanks", "you", "bye", "goodbye", "see you", "see you later"]
+    if text.lower().strip(".!, ") in FILLER_PHRASES:
+        return ""
+
     print(f"You said: {text}")
     return text
 
@@ -183,7 +188,7 @@ def parse_timetable_entry(text):
                     "\"time\" (24hr format HH:MM e.g. 14:30), "
                     "\"event\" (short event name, title case). "
                     "If day is missing assume today. "
-                    "If time is ambiguous use your best guess. "
+                    "If time is missing or ambiguous, set time to null. "
                     "Return ONLY the JSON, no explanation, no markdown."
                 )
             },
@@ -193,6 +198,7 @@ def parse_timetable_entry(text):
     raw = response.choices[0].message.content.strip()
     # Strip markdown fences if present
     raw = raw.replace("```json", "").replace("```", "").strip()
+    print(f"LLM returned: {raw}")  # ADD THIS LINE
     return json.loads(raw)
 
 def add_to_timetable(text):
@@ -203,6 +209,9 @@ def add_to_timetable(text):
         time  = entry["time"]
         event = entry["event"]
 
+        if time is None:
+            return f"What time would you like to add {event}?"
+        
         # Reload fresh from disk so we never overwrite concurrent changes
         with open("timetable.json", "r") as f:
             data = json.load(f)

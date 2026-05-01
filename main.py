@@ -10,7 +10,7 @@ from logic import (is_timetable_query, handle_timetable,
 import ui
 from ui import launch
 
-WAKE_WORD  = "jarvis"
+WAKE_WORDS = ["jarvis"]
 EXIT_WORDS = ["exit", "quit", "goodbye", "bye", "stop", "shutdown", "close", "terminate"]
 STATE_FILE = "jarvis_state.txt"
 
@@ -23,7 +23,7 @@ def is_exit(text):
 
 def run_jarvis():
     set_state("idle")
-    speak("Jarvis online. Say 'Hey Jarvis' when you need me.")
+    speak("Jarvis online. Say 'Hey Jarvis' or 'Jarvis wake up' when you need me.")
     print("Waiting for wake word: 'Hey Jarvis'...")
 
     while True:
@@ -39,7 +39,7 @@ def run_jarvis():
             ui.shutdown()   # close the window
             return
 
-        if WAKE_WORD not in wake_text.lower():
+        if not any(word in wake_text.lower() for word in WAKE_WORDS):
             continue
 
         set_state("wake")
@@ -63,12 +63,22 @@ def run_jarvis():
 
             if is_add_timetable(text):
                 response = add_to_timetable(text)
+                speak(response)
+                if "What time would you like to add" in response:
+                    set_state("listening")
+                    follow_up = listen()
+                    if follow_up:
+                        # Extract event name from response and build clearer sentence
+                        event_name = response.replace("What time would you like to add ", "").strip("?")
+                        combined = f"add {event_name} at {follow_up}"
+                        response = add_to_timetable(combined)
+                        speak(response)
             elif is_timetable_query(text):
                 response = handle_timetable(text)
+                speak(response)
             else:
                 response = ask_ai(text)
-
-            speak(response)
+                speak(response)
             time.sleep(0.3)
 
 if __name__ == "__main__":
