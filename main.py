@@ -82,6 +82,8 @@ def run_jarvis():
                 speak(response)
             elif is_email_query(text) or is_email_active():
                 response = handle_email(text)
+                if response is None:
+                    response = ask_ai(text)
                 speak(response)
             else:
                 response = ask_ai(text)

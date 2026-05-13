@@ -142,6 +142,37 @@ def fetch_from_sender(conn: imaplib.IMAP4_SSL, name: str, limit: int = 5) -> lis
     return emails
 
 
+def fetch_read(conn: imaplib.IMAP4_SSL, limit: int = 25) -> list[dict]:
+    """
+    Fetch the most recent already-read emails from INBOX.
+    Returns a list of dicts: {uid, from, subject, body, date}
+    """
+    conn.select("INBOX")
+    status, data = conn.uid("search", None, "SEEN")
+    if status != "OK" or not data[0]:
+        return []
+
+    uids = data[0].split()[-limit:]
+    emails = []
+
+    for uid in reversed(uids):
+        status, msg_data = conn.uid("fetch", uid, "(RFC822)")
+        if status != "OK":
+            continue
+        raw = msg_data[0][1]
+        msg = email.message_from_bytes(raw)
+
+        emails.append({
+            "uid":     uid.decode(),
+            "from":    _decode_field(msg.get("From")),
+            "subject": _decode_field(msg.get("Subject")),
+            "date":    _decode_field(msg.get("Date")),
+            "body":    _get_body(msg),
+        })
+
+    return emails
+
+
 def mark_read(conn: imaplib.IMAP4_SSL, uid: str) -> bool:
     """Mark an email as read by UID. Returns True on success."""
     conn.select("INBOX")
@@ -171,13 +202,3 @@ def disconnect(conn: imaplib.IMAP4_SSL) -> None:
         conn.logout()
     except Exception:
         pass
-
-if __name__ == "__main__":
-    conn = connect_gmail()
-    emails = fetch_unread(conn, limit=3)
-    if emails:
-        for e in emails:
-            print(e["subject"], "|", e["from"])
-    else:
-        print("Connected OK — no unread emails found")
-    disconnect(conn)

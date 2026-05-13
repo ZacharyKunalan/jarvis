@@ -85,3 +85,55 @@
  - Email fine-tuning (Unsloth + LoRA on RTX 3060)
    trains model on your own email style/preferences
  - Outlook email support alongside Gmail
+
+
+
+ ───────────────────────────────────────
+  WHISPER FINE-TUNING (ACCENT & ACCURACY)
+───────────────────────────────────────
+
+Goal: Fine-tune Whisper on your voice so J.A.R.V.I.S
+understands your accent, contact names, and commands
+reliably. Removes Groq STT dependency entirely.
+
+Phase 1 — Recording Script + Tool
+   - Generate a script covering:
+       J.A.R.V.I.S commands, contact names, email
+       senders, numbers, days, weather phrases,
+       timetable vocabulary
+   - Build a simple Python recording tool that
+       saves each sentence as a labelled .wav file
+   - Target: 15-30 mins per day for 4-5 days
+   - Minimum before first fine-tune: ~60 minutes
+
+Phase 2 — Data Preparation
+   - Format recordings into Whisper training format
+       (audio + transcript pairs as .json manifest)
+   - Split into train / validation sets
+   - Verify audio quality and transcript alignment
+
+Phase 3 — Fine-Tune with Unsloth
+   - Install Unsloth + dependencies
+   - Run LoRA fine-tune on RTX 3060 12GB
+   - Expected training time: 2-4 hours
+   - Output: LoRA adapter file (~50-100MB)
+   - Base model: openai/whisper-large-v3
+
+Phase 4 — Swap into J.A.R.V.I.S
+   - Replace Groq Whisper call with local
+       fine-tuned Whisper + adapter
+   - Remove GROQ_API_KEY dependency for STT
+   - Groq only needed for LLM after this
+     (can be replaced by Ollama later if desired)
+
+Expected improvement timeline:
+   4-5 days recording  →  first fine-tune run
+   1 week recording    →  strong accent accuracy
+   2 weeks recording   →  near-perfect for your vocab
+
+Notes:
+   - RTX 3060 12GB handles this comfortably
+   - All audio stays local, never uploaded
+   - Unsloth makes fine-tuning memory efficient
+   - LoRA adapter attaches to base Whisper model
+   - whisper-large-v3 is the target base model
