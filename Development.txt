@@ -351,17 +351,85 @@ UI OVERHAUL (ui.py rebuilt from scratch):
   - Amber glow on speaking state
 
 ───────────────────────────────────────────────────────
+  SESSION 11 — Email Reader (Gmail + Local Summarisation)
+───────────────────────────────────────────────────────
+
+Goal: Build a private, voice-controlled email reader
+into J.A.R.V.I.S. Gmail via IMAP, summaries processed
+locally so email content never leaves the PC.
+
+NEW FILES:
+  email_module.py   — IMAP connection + fetch/delete
+  email_summariser.py — Local Ollama summarisation
+  email_handler.py  — Voice intent routing + session state
+
+GMAIL SETUP:
+  - Enabled IMAP in Gmail Forwarding and POP/IMAP settings
+  - Set deleted emails to move to Trash (not archive)
+  - Generated App Password at myaccount.google.com/apppasswords
+  - Stored credentials in .env as GMAIL_ADDRESS and
+    GMAIL_APP_PASSWORD
+
+IMAP MODULE (email_module.py):
+  - Built using imaplib only (no third-party libraries)
+  - connect_gmail() and connect_outlook() via IMAP4_SSL
+  - fetch_unread(conn, limit) returns list of email dicts
+    each with: uid, from, subject, body, date
+  - fetch_from_sender(conn, name) for filtered queries
+  - mark_read(conn, uid) and delete_email(conn, uid)
+  - Email bodies never written to disk
+
+LOCAL SUMMARISATION (email_summariser.py):
+  - Uses Ollama running llama3.1:8b locally on RTX 3060
+  - Calls http://127.0.0.1:11434/api/chat (native format)
+  - stream: False to get full response in one call
+  - check_ollama_available() pings Ollama before use
+  - System prompt tuned to avoid preamble, markdown,
+    quotation marks, and addressing user by name
+  - Ollama installed separately, runs as background service
+
+VOICE HANDLER (email_handler.py):
+  - is_email_query() keyword detector for intent routing
+  - is_email_active() keeps session alive across turns
+    so "keep it", "delete it" etc. don't fall to ask_ai
+  - Multi-turn session state machine:
+      new session → cluster overview → drill into sender
+      → read summaries → keep/delete/full read → next
+  - Emails grouped by sender on fetch (clustering):
+      "You have 10 unread emails. 3 from LinkedIn,
+       2 from Xbox, 1 from Instagram..." 
+      User picks a sender by name or says 'all'
+  - After a sender's emails are exhausted, returns
+    to cluster menu automatically
+  - Delete requires explicit voice confirmation
+  - "Stop" exits the email session cleanly at any time
+  - fetch_unread limit set to 25 to match full inbox
+
+MAIN.PY CHANGES:
+  - Added is_email_active() to import
+  - Email intent routed via:
+      elif is_email_query(text) or is_email_active():
+  - Sits between weather and ask_ai in routing block
+
+STACK ADDITIONS:
+  - Ollama (local inference server)
+  - llama3.1:8b model (~4.7GB, runs on RTX 3060 12GB)
+
+───────────────────────────────────────────────────────
   CURRENT STACK (Full)
 ───────────────────────────────────────────────────────
 
   TTS:         edge-tts + playsound==1.2.2
                voice: en-GB-RyanNeural
   STT:         Groq whisper-large-v3-turbo
-  LLM:         Groq llama-3.1-8b-instant
+  LLM:         Groq llama-3.1-8b-instant (general queries)
+               Ollama llama3.1:8b (email summarisation, local)
   Wake word:   openWakeWord (hey_jarvis_v0.1.onnx)
   Audio:       sounddevice + webrtcvad (custom wrapper)
   Weather:     Open-Meteo API (Guildford, Surrey)
   Timetable:   timetable.json + voice add + follow-up
+  Email:       imaplib IMAP (Gmail) + Ollama summarisation
+               email_module.py / email_summariser.py / email_handler.py
   UI:          tkinter (460x660, animated orb, stats bar)
   State sync:  jarvis_state.txt
   Env:         python-dotenv (.env)
@@ -369,12 +437,5 @@ UI OVERHAUL (ui.py rebuilt from scratch):
 ───────────────────────────────────────────────────────
   UP NEXT
 ───────────────────────────────────────────────────────
-
-  - Reminders / countdown to next event
-  - Conversation memory ("what did I ask earlier?")
-  - ElevenLabs or Piper TTS voice upgrade
-  - System tray mode (minimise to taskbar)
-  - Fix timetable specific day queries
-  - Further Whisper accuracy improvements
 
   See plan.txt

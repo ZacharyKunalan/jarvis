@@ -8,6 +8,7 @@ from logic import (is_timetable_query, handle_timetable,
                    is_add_timetable, add_to_timetable,
                    is_weather_query, get_weather,
                    ask_ai, speak, listen_for_wake_word, listen)
+from email_handler import is_email_query, handle_email, is_email_active
 import ui
 from ui import launch
 
@@ -37,7 +38,7 @@ def run_jarvis():
         if is_exit(wake_text):
             set_state("idle")
             speak("Goodbye!")
-            ui.shutdown()   # close the window
+            ui.shutdown()
             return
 
         if not any(word in wake_text.lower() for word in WAKE_WORDS):
@@ -57,7 +58,7 @@ def run_jarvis():
             if is_exit(text):
                 set_state("idle")
                 speak("Goodbye!")
-                ui.shutdown()   # close the window
+                ui.shutdown()
                 return
 
             set_state("speaking")
@@ -69,7 +70,6 @@ def run_jarvis():
                     set_state("listening")
                     follow_up = listen()
                     if follow_up:
-                        # Extract event name from response and build clearer sentence
                         event_name = response.replace("What time would you like to add ", "").strip("?")
                         combined = f"add {event_name} at {follow_up}"
                         response = add_to_timetable(combined)
@@ -79,6 +79,9 @@ def run_jarvis():
                 speak(response)
             elif is_weather_query(text):
                 response = get_weather(text)
+                speak(response)
+            elif is_email_query(text) or is_email_active():
+                response = handle_email(text)
                 speak(response)
             else:
                 response = ask_ai(text)

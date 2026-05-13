@@ -20,6 +20,14 @@
  - Whisper accuracy improvements
  - UI overhaul (larger, brighter, stats bar)
  - Timetable follow-up listen for missing time
+ - Email reader (Gmail IMAP, local summarisation)
+    - Fetch unread emails by voice
+    - Grouped by sender ("3 from LinkedIn, 2 from Xbox...")
+    - Pick a sender to drill into
+    - 1-2 sentence summaries via local Ollama llama3.1:8b
+    - Keep, delete (with confirmation), read full body
+    - "Stop" to exit session at any time
+    - Email content never leaves the PC
 
 ───────────────────────────────────────
   UP NEXT
@@ -50,6 +58,12 @@
     - Run Jarvis silently in background
     - Click tray icon to restore window
 
+ 6. Email reply drafting
+    - Draft a reply by voice
+    - Read draft back for confirmation
+    - User confirms before sending
+    - Outlook support (add alongside Gmail)
+
 ───────────────────────────────────────
   BLOCKED
 ───────────────────────────────────────
@@ -68,58 +82,6 @@
  - Further Whisper accuracy improvements
  - "What's the weather in X city?" (multi-city)
  - ElevenLabs premium voice (if free tier enough)
-
- ───────────────────────────────────────
-  EMAIL ASSISTANT (PLANNED)
-───────────────────────────────────────
-
- Phase 1 — Email Reading (IMAP)
-    - Connect Gmail via IMAP + App Password
-    - Connect Outlook via IMAP
-    - Fetch unread emails on voice command
-    - Strip to plain text for LLM parsing
-    - "Hey Jarvis, any new emails?"
-    - "Do I have anything from [name]?"
-
- Phase 2 — Summarisation
-    - Pass email text to Groq LLaMA
-    - Read 1-2 sentence summary aloud
-    - "Summarise my emails from today"
-    - Support follow-up: "read the full one"
-
- Phase 3 — Actions
-    - Voice delete: "delete it"
-    - Voice archive: "keep it"
-    - Voice reply (draft only, user confirms)
-    - Mark as read after summary
-
- Phase 4 — Local LLM (Privacy Upgrade)
-    - Install Ollama on local machine
-    - RTX 3060 can run Llama 3.1 8B or
-      Mistral 7B comfortably at good speed
-    - Swap Groq email summarisation for
-      local Ollama — emails never leave PC
-    - General commands still use Groq
-      (no personal data involved there)
-
- Phase 5 — Fine-tuning (Advanced)
-    - Fine-tune Mistral 7B or Llama 3.1 8B
-      on your own email style/preferences
-    - Teaches model YOUR writing patterns
-    - Requires: Ollama + a few hours of
-      training on RTX 3060
-    - Makes replies feel personal, not generic
-
-───────────────────────────────────────
-  NOTES
-───────────────────────────────────────
-
- - Gmail: enable IMAP + generate App Password
-   at myaccount.google.com/apppasswords
- - Outlook: enable IMAP in settings
- - imaplib is built into Python (no install)
- - Ollama: free, open source, ollama.com
- - RTX 3060 (12GB): can run 7-8B models
-   comfortably, 13B models at reduced speed
- - Email text sent to Groq in Phase 2 only
-   — replaced by local in Phase 4
+ - Email fine-tuning (Unsloth + LoRA on RTX 3060)
+   trains model on your own email style/preferences
+ - Outlook email support alongside Gmail
