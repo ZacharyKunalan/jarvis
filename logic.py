@@ -4,6 +4,7 @@ import asyncio
 import edge_tts
 import os
 import wave
+import subprocess
 from playsound import playsound
 import sounddevice as sd
 import numpy as np
@@ -18,6 +19,27 @@ groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 # Load timetable
 with open("timetable.json", "r") as f:
     timetable = json.load(f)
+
+# ------------------------
+# 🎤 PERSISTENT STT SERVER
+# ------------------------
+
+_stt_proc = None
+
+def _get_stt():
+    global _stt_proc
+    if _stt_proc is None or _stt_proc.poll() is not None:
+        print("Starting local STT server...")
+        _stt_proc = subprocess.Popen(
+            [r"stt_venv\Scripts\python.exe", "stt_server.py"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True
+        )
+        # Wait for READY signal
+        _stt_proc.stdout.readline()
+        print("STT server ready.")
+    return _stt_proc
 
 # ------------------------
 # 🔊 TEXT TO SPEECH
@@ -37,18 +59,14 @@ def speak(text):
         print("TTS Error:", e)
 
 # ------------------------
-# 🎤 RAW AUDIO CAPTURE (shared by both listeners)
+# 🎤 RAW AUDIO CAPTURE
 # ------------------------
 
 def _capture_audio(max_silent_chunks=30):
-    """
-    Records audio using VAD. Returns raw audio bytes, or None if nothing was captured.
-    max_silent_chunks controls how long silence is tolerated before stopping.
-    """
     sample_rate = 16000
-    chunk_duration = 0.03  # 30ms chunks required by webrtcvad
+    chunk_duration = 0.03
     chunk_size = int(sample_rate * chunk_duration)
-    vad = webrtcvad.Vad(2)  # 0-3, higher = more aggressive
+    vad = webrtcvad.Vad(2)
 
     frames = []
     silent_chunks = 0
@@ -76,7 +94,6 @@ def _capture_audio(max_silent_chunks=30):
 # ------------------------
 
 def _transcribe(audio_bytes, min_words=1):
-    # Skip transcription if audio is too quiet (background noise)
     audio_array = np.frombuffer(audio_bytes, dtype=np.int16)
     if np.abs(audio_array).mean() < 20:
         return ""
@@ -87,18 +104,13 @@ def _transcribe(audio_bytes, min_words=1):
         wf.setframerate(16000)
         wf.writeframes(audio_bytes)
 
-    with open("input.wav", "rb") as f:
-        transcription = groq_client.audio.transcriptions.create(
-            model="whisper-large-v3-turbo",
-            file=f,
-            language="en",
-            prompt="Jarvis, exit, quit, goodbye, stop, yes, no, gym, schedule, timetable, weather, add, walk, reminder, what, when, today, tomorrow"
-        )
-
+    stt = _get_stt()
+    stt.stdin.write("input.wav\n")
+    stt.stdin.flush()
+    text = stt.stdout.readline().strip()
     os.remove("input.wav")
-    text = transcription.text.strip()
 
-    if len(text.split()) < min_words:
+    if not text or text.startswith("ERROR") or len(text.split()) < min_words:
         return ""
 
     FILLER_PHRASES = ["thank you", "thanks", "you", "bye", "goodbye", "see you", "see you later"]
@@ -110,16 +122,14 @@ def _transcribe(audio_bytes, min_words=1):
 
 # ------------------------
 # 🎤 WAKE WORD LISTENER
-# Accepts single words like "Jarvis", "Hey Jarvis"
-# Uses shorter silence timeout so it's snappy
 # ------------------------
 
 def listen_for_wake_word():
     import openwakeword
     from openwakeword.model import Model as WakeWordModel
     oww_model = WakeWordModel(wakeword_models=["hey_jarvis_v0.1"], inference_framework="onnx")
-    
-    chunk_size = 1280  # required by openWakeWord
+
+    chunk_size = 1280
     with sd.RawInputStream(samplerate=16000, channels=1, dtype="int16", blocksize=chunk_size) as stream:
         while True:
             chunk, _ = stream.read(chunk_size)
@@ -129,11 +139,9 @@ def listen_for_wake_word():
             if score > 0.7:
                 oww_model.reset()
                 return "hey jarvis"
-            
 
 # ------------------------
 # 🎤 COMMAND LISTENER
-# Used after wake word — expects a proper command
 # ------------------------
 
 def listen():
@@ -142,7 +150,7 @@ def listen():
         print("Jarvis: Didn't catch that...")
         return ""
 
-    text = _transcribe(audio, min_words=1)  # min_words=1 so "exit" alone works
+    text = _transcribe(audio, min_words=1)
     if not text:
         print("Jarvis: Didn't catch that...")
     return text
@@ -177,7 +185,6 @@ def is_add_timetable(text):
     return any(phrase in text for phrase in add_keywords)
 
 def _resolve_relative_days(text):
-    """Replace today/tomorrow with actual weekday names before LLM parsing."""
     from datetime import timedelta
     today    = datetime.now()
     tomorrow = today + timedelta(days=1)
@@ -187,8 +194,7 @@ def _resolve_relative_days(text):
     return text
 
 def parse_timetable_entry(text):
-    """Use Groq LLM to extract day, time, and event name from natural language."""
-    text = _resolve_relative_days(text)  # fix relative days first
+    text = _resolve_relative_days(text)
     response = groq_client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[
@@ -209,13 +215,11 @@ def parse_timetable_entry(text):
         ]
     )
     raw = response.choices[0].message.content.strip()
-    # Strip markdown fences if present
     raw = raw.replace("```json", "").replace("```", "").strip()
-    print(f"LLM returned: {raw}")  # ADD THIS LINE
+    print(f"LLM returned: {raw}")
     return json.loads(raw)
 
 def add_to_timetable(text):
-    """Parse the voice command and write the new entry to timetable.json."""
     try:
         entry = parse_timetable_entry(text)
         day   = entry["day"].lower()
@@ -224,27 +228,23 @@ def add_to_timetable(text):
 
         if time is None:
             return f"What time would you like to add {event}?"
-        
-        # Reload fresh from disk so we never overwrite concurrent changes
+
         with open("timetable.json", "r") as f:
             data = json.load(f)
 
         if day not in data:
             data[day] = []
 
-        # Avoid duplicates
         for existing in data[day]:
             if existing["time"] == time and existing["event"].lower() == event.lower():
                 return f"{event} at {time} on {day.capitalize()} is already in your timetable."
 
         data[day].append({"time": time, "event": event})
-        # Sort that day's events by time
         data[day].sort(key=lambda e: e["time"])
 
         with open("timetable.json", "w") as f:
             json.dump(data, f, indent=2)
 
-        # Keep in-memory copy in sync
         global timetable
         timetable = data
 
@@ -273,11 +273,9 @@ def handle_timetable(text):
     else:
         return "I'm not sure which day you mean."
 
-
 # ------------------------
 # 🤖 AI (Weather)
 # ------------------------
-
 
 LATITUDE  = 51.2365
 LONGITUDE = -0.5703
@@ -294,7 +292,7 @@ def get_weather(text):
         data = json.loads(r.read())
 
     daily = data["daily"]
-    
+
     if "tomorrow" in text.lower():
         idx = 1
         day_label = "Tomorrow"
@@ -322,7 +320,6 @@ def get_weather(text):
 def is_weather_query(text):
     keywords = ["weather", "temperature", "rain", "forecast", "sunny", "cold", "warm"]
     return any(word in text.lower() for word in keywords)
-
 
 # ------------------------
 # 🤖 AI (Groq LLM)

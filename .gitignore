@@ -15,3 +15,16 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# STT venv (Python 3.11, separate from main venv)
+stt_venv/
+
+# Training data and model adapter (too large for GitHub)
+training_data/
+training_data.zip
+whisper-jarvis-adapter/
+whisper-jarvis-adapter.zip
+
+# Audio files
+*.mp3
+*.wav
